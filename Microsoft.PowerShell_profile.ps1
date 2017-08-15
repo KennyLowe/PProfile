@@ -1,8 +1,18 @@
 #PowerShell Profile
-#Kenny Lowe 2016
-#Updated 14/07/2016
+#Kenny Lowe 2017
+#Updated 15/08/2017
 
 Import-Module Write-ASCII
+Import-Module AzureRM
+
+cd "C:\Users\Kenny\OneDrive - KennyLowe\Source Control\Scripts"
+
+$username = "kenny@kennylowe.org"
+$pwdTxt = Get-Content ".\ExportedPassword.txt"
+$SecurePwd = $pwdTxt | ConvertTo-SecureString
+$credObject = New-Object System.Management.Automation.PSCredential -ArgumentList $username, $SecurePwd
+
+Login-AzureRMAccount -SubscriptionId b8f0035f-44e8-49af-ba68-9c7b8177e367 -Credential $credObject
 
 If($Host.UI.RawUI.WindowTitle -like "*administrator*")
 {
@@ -12,8 +22,6 @@ If($Host.UI.RawUI.WindowTitle -like "*administrator*")
 function banner
 {
 	write-host ""
-	write-host "Importing Module PSTab..." -ForegroundColor "Magenta"
-	Import-Module PowerTab
 	write-host ""
 	write-ascii "Custom commands..." -Fore "Green"
 	write-host ""
@@ -68,6 +76,19 @@ banner
  }
 }
 sal New-Scope Start-NewScope
+
+Import-Module posh-git
+
+function global:prompt {
+  $realLASTEXITCODE = $LASTEXITCODE
+
+  Write-Host($pwd.ProviderPath) -nonewline
+
+  Write-VcsStatus
+
+  $global:LASTEXITCODE = $realLASTEXITCODE
+  return "> "
+}
 
 function Test-DNSFlush
 {
@@ -144,7 +165,7 @@ function prompt
     write-host $(Get-Time) -foreground yellow -noNewLine
     write-host "] " -noNewLine
     # Write the path
-    write-host $($(Get-Location).Path) -foreground green -noNewLine
+    write-host $($(Get-Location).Path | Split-Path -Leaf) -foreground green -noNewLine
     write-host $(if ($nestedpromptlevel -ge 1) { '>>' }) -noNewLine
     return "> "
 }
@@ -214,7 +235,7 @@ filter unlike( $glob )
 
 write-ascii "Transcript logging..." -Fore Green
 write-host ""
-$Transcript = Start-Transcript -OutputDirectory "C:\Users\kenny\OneDrive\Documents\WindowsPowerShell\Transcripts"
+$Transcript = Start-Transcript -OutputDirectory "C:\Users\kenny\OneDrive\Documents\WindowsPowerShell\Transcripts\"
 write-host $Transcript -ForegroundColor "Green"
 write-host ""
 
@@ -252,3 +273,9 @@ function Search-TextFile {
 Set-Alias grep Search-TextFile
 
 
+
+# Chocolatey profile
+$ChocolateyProfile = "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+if (Test-Path($ChocolateyProfile)) {
+  Import-Module "$ChocolateyProfile"
+}
