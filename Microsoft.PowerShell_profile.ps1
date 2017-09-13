@@ -3,7 +3,6 @@
 #Updated 15/08/2017
 
 Import-Module Write-ASCII
-Import-Module AzureRM
 
 cd "C:\Users\Kenny\OneDrive - KennyLowe\Source Control\Scripts"
 
@@ -12,11 +11,31 @@ $pwdTxt = Get-Content ".\ExportedPassword.txt"
 $SecurePwd = $pwdTxt | ConvertTo-SecureString
 $credObject = New-Object System.Management.Automation.PSCredential -ArgumentList $username, $SecurePwd
 
-Login-AzureRMAccount -SubscriptionId b8f0035f-44e8-49af-ba68-9c7b8177e367 -Credential $credObject
+$AzureLogin = Read-Host "Login to Azure? (Y/N)"
+while("Y","N","Yes","No" -notcontains $AzureLogin)
+{
+    $AzureLogin = Read-Host "Login to Azure? (Y/N)"
+}
+
+If ($AzureLogin -eq "Y") 
+{ 
+	Import-Module AzureRM
+	Login-AzureRMAccount -SubscriptionId b8f0035f-44e8-49af-ba68-9c7b8177e367 -Credential $credObject 
+	Get-AzureRmProviderFeature -FeatureName AllowArchive -ProviderNamespace  Microsoft.Storage
+}
 
 If($Host.UI.RawUI.WindowTitle -like "*administrator*")
 {
 	Write-ASCII "Administrator" -Fore Green
+}
+
+
+
+function Test-IsPS32 
+{
+    $psfilename = (Get-Process -id $pid).mainmodule.filename
+    if ($psfilename -match "SysWoW64") { $True }
+    else { $False }
 }
 
 function banner
@@ -56,6 +75,11 @@ function banner
 	write-host -nonewline "|" -ForegroundColor "Magenta"
 	write-host -nonewline " Changes all linebreaks to \r\n  " -ForegroundColor "Yellow"
 	write-host "         |" -ForegroundColor "Magenta"
+	write-host -nonewline "|" -ForegroundColor "Magenta"
+	write-host -nonewline " FOP             " -ForegroundColor "Yellow"
+	write-host -nonewline "|" -ForegroundColor "Magenta"
+	write-host -nonewline " Edit PowerShell Profile         " -ForegroundColor "Yellow"
+	write-host "         |" -ForegroundColor "Magenta"
 	write-host " ------------------------------------------------------------" -ForegroundColor "Magenta"
 	write-host ""
 }
@@ -80,14 +104,14 @@ sal New-Scope Start-NewScope
 Import-Module posh-git
 
 function global:prompt {
-  $realLASTEXITCODE = $LASTEXITCODE
+#  $realLASTEXITCODE = $LASTEXITCODE
 
-  Write-Host($pwd.ProviderPath) -nonewline
+#  Write-Host($pwd.ProviderPath) -nonewline
 
-  Write-VcsStatus
+#  Write-VcsStatus
 
-  $global:LASTEXITCODE = $realLASTEXITCODE
-  return "> "
+#  $global:LASTEXITCODE = $realLASTEXITCODE
+# return "> "
 }
 
 function Test-DNSFlush
@@ -102,6 +126,7 @@ $i=1
 Do 
 {
     ipconfig /flushdns
+    Start-Sleep 10
     ping $url
 }
 While ($i=1)
@@ -160,14 +185,86 @@ function Get-Time { return $(get-date | foreach { $_.ToLongTimeString() } ) }
 
 function prompt
 {
-    # Write the time 
+#add global variable if it doesn't already exist
+
+if (-Not $global:LastCheck) 
+{
+	$global:LastCheck = Get-Date
+    	$global:cdrive = Get-CimInstance -query "Select Freespace,Size from win32_logicaldisk where deviceid='c:'"
+
+}
+
+
+
+#only refresh disk information once every 15 minutes
+$min = (New-TimeSpan $Global:lastCheck).TotalMinutes
+
+if ($min -ge 15) 
+{
+
+    $global:cdrive = Get-CimInstance -query "Select Freespace,Size from win32_logicaldisk where deviceid='c:'"
+    $global:LastCheck = Get-Date
+}
+
+$diskinfo = "{0:N2}" -f (($global:cdrive.freespace/1gb)/($global:cdrive.size/1gb)*100)
+
+#only the get the CIM properties we need to cut down on processing time
+$cpu = (Get-CimInstance -ClassName win32_processor -property loadpercentage).loadpercentage
+
+#get the number of running processes
+$pcount = (Get-Process).Count
+$os = Get-CimInstance -class Win32_OperatingSystem -Property LastBootUpTime,TotalVisibleMemorySize,FreePhysicalMemory
+
+#calculate the percentage of free physical memory
+$freeMem = $os.freephysicalmemory/1mb
+
+#get uptime
+$time = $os.LastBootUpTime
+[TimeSpan]$uptime = New-TimeSpan $time $(get-date)
+
+#construct an uptime string e.g. 13d 15h 18m 38s
+$up = "$($uptime.days)d $($uptime.hours)h $($uptime.minutes)m $($uptime.seconds)s"
+
+#this is the text to appear in the status box
+$text="CPU:{0}% FreeMem:{6:n2}GB Procs:{1} Free C:{2}% {3}{4} {5}"  -f $cpu.ToString().padleft(2,"0"),$pcount,$diskinfo,([char]0x25b2),$up,(Get-Date -format G),$FreeMem
+
+#display prompt data in color based on the amount of free memory
+$pctFreeMem = $os.FreePhysicalMemory/$os.TotalVisibleMemorySize
+
+if ($pctFreeMem -ge .50) {
+    $color = "green"
+}
+
+elseif ($pctFreeMem -ge .20) {
+    $color = "yellow"
+}
+
+else {
+    $color = "red"
+}
+
+#write the status box with an appropriate outline color
+Write-Host $([char]0x250c) -NoNewline -ForegroundColor $color
+Write-Host $(([char]0x2500).ToString()*$text.length ) -ForegroundColor $color -NoNewline
+Write-Host $([char]0x2510) -ForegroundColor $color
+Write-Host $([char]0x2502) -ForegroundColor $color -NoNewline
+Write-Host $text -NoNewline
+Write-Host $([char]0x2502) -ForegroundColor $color
+Write-Host $([char]0x2514) -ForegroundColor $color -NoNewline
+Write-Host $(([char]0x2500).ToString()*$text.length) -NoNewline -ForegroundColor $color
+Write-Host $([char]0x2518) -ForegroundColor $color
+
+
+
+#write a prompt to the host
     write-host "[" -noNewLine
     write-host $(Get-Time) -foreground yellow -noNewLine
     write-host "] " -noNewLine
     # Write the path
     write-host $($(Get-Location).Path | Split-Path -Leaf) -foreground green -noNewLine
-    write-host $(if ($nestedpromptlevel -ge 1) { '>>' }) -noNewLine
-    return "> "
+   write-host $(if ($nestedpromptlevel -ge 1) { '>>' }) -noNewLine
+
+return ""
 }
 
 function LL
