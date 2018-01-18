@@ -1,15 +1,17 @@
 #PowerShell Profile
-#Kenny Lowe 2017
-#Updated 15/08/2017
+#Kenny Lowe 2017-2018
+#Updated 18/01/2018
 
 Import-Module Write-ASCII
 
-cd "C:\Users\Kenny\OneDrive - KennyLowe\Source Control\Scripts"
-
-$username = "kenny@kennylowe.org"
+#Username for Azure Login
+$username = "email@address.com"
+#Store Password encrypted in a file somewhere
 $pwdTxt = Get-Content ".\ExportedPassword.txt"
 $SecurePwd = $pwdTxt | ConvertTo-SecureString
 $credObject = New-Object System.Management.Automation.PSCredential -ArgumentList $username, $SecurePwd
+#Sub you want to login to
+$SubscriptionID = your-subscription-id
 
 $AzureLogin = Read-Host "Login to Azure? (Y/N)"
 while("Y","N","Yes","No" -notcontains $AzureLogin)
@@ -20,7 +22,7 @@ while("Y","N","Yes","No" -notcontains $AzureLogin)
 If ($AzureLogin -eq "Y") 
 { 
 	Import-Module AzureRM
-	Login-AzureRMAccount -SubscriptionId b8f0035f-44e8-49af-ba68-9c7b8177e367 -Credential $credObject 
+	Login-AzureRMAccount -SubscriptionId $SubscriptionID -Credential $credObject 
 	Get-AzureRmProviderFeature -FeatureName AllowArchive -ProviderNamespace  Microsoft.Storage
 }
 
@@ -28,8 +30,6 @@ If($Host.UI.RawUI.WindowTitle -like "*administrator*")
 {
 	Write-ASCII "Administrator" -Fore Green
 }
-
-
 
 function Test-IsPS32 
 {
